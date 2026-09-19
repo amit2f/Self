@@ -5,8 +5,7 @@ import random
 from pathlib import Path
 
 from telethon import TelegramClient, events, Button
-from telethon.sessions import StringSession
-from telethon.tl.functions.account import UpdateProfileRequest
+ from telethon.tl.functions.account import UpdateProfileRequest
 from telethon.tl.functions.contacts import BlockRequest, UnblockRequest
 from telethon.tl.functions.channels import JoinChannelRequest
 from telethon.tl.functions.messages import ReadHistoryRequest
@@ -55,8 +54,6 @@ API_ID = int(env("API_ID", cfg.get("api_id", 0)))
 API_HASH = env("API_HASH", cfg.get("api_hash", ""))
 OWNER_ID = int(env("OWNER_ID", cfg.get("owner_id", 0)))
 BOT_TOKEN = env("BOT_TOKEN", cfg.get("bot_token", ""))
-STRING_SESSION = env("STRING_SESSION", "").strip()
-
 if not API_ID or not API_HASH:
     raise RuntimeError("API_ID و API_HASH را در Secrets سرویس قرار بده.")
 if not OWNER_ID:
@@ -64,11 +61,11 @@ if not OWNER_ID:
 if not BOT_TOKEN:
     raise RuntimeError("BOT_TOKEN را در Secrets سرویس قرار بده.")
 
-if STRING_SESSION:
-    user = TelegramClient(StringSession(STRING_SESSION), API_ID, API_HASH)
-else:
-    user = TelegramClient(cfg.get("session_name", "selfsaz_session"), API_ID, API_HASH)
-
+# Persistent local session: no STRING_SESSION is required.
+# On the first run Telethon will ask for the phone number, login code,
+# and 2FA password (if enabled). The resulting .session file is reused
+# on later runs as long as the Replit storage/project is preserved.
+user = TelegramClient(cfg.get("session_name", "selfsaz_session"), API_ID, API_HASH)
 control = TelegramClient("control_bot", API_ID, API_HASH)
 
 def is_owner(event):
@@ -391,12 +388,9 @@ async def personal_features(event):
             pass
 
 async def main():
-    if STRING_SESSION:
-        await user.connect()
-        if not await user.is_user_authorized():
-            raise RuntimeError("STRING_SESSION معتبر نیست.")
-    else:
-        await user.start()
+    # First launch is interactive: phone -> Telegram login code -> 2FA if enabled.
+    # Subsequent launches reuse the generated local .session file.
+    await user.start()
 
     print("User session connected.")
     await control.start(bot_token=BOT_TOKEN)
